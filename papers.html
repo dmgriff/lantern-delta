@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -20,11 +19,14 @@
 </main>
 
 <script>
-const SUMMARY_PROXY_URL = "lantern-delta-summary.dmgriffith.workers.dev"; // optional proxy URL
+/* ==== CONFIG: set your deployed Cloudflare Worker URL here ==== */
+const SUMMARY_PROXY_URL = ""; // e.g. "https://lantern-delta-summary.YOURNAME.workers.dev"
 
+/* ================= utility ================= */
 function esc(s){return (s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m]||m));}
 function ym(dateStr){if(!dateStr)return""; const d=new Date(dateStr); return d.toLocaleString(undefined,{year:'numeric',month:'short'});}
 
+/* ================= filters ================= */
 function filtersUI(state){
   const btn=(n,v,l)=>`<a href="#" class="btn ${state[n]===v?'active':''}" data-name="${n}" data-val="${v}">${l}</a>`;
   return [
@@ -52,6 +54,8 @@ function applyFilters(recs, state, view){
   if(state.intv!=='all') out=out.filter(r=>(r.intervention||'other')===state.intv);
   return out;
 }
+
+/* ================= cards ================= */
 function renderCard(p, slug){
   const pmid = esc(p.pmid||"");
   const pubmed = pmid?`https://pubmed.ncbi.nlm.nih.gov/${pmid}/`:"";
@@ -79,15 +83,18 @@ function renderCard(p, slug){
     </details>
   </article>`;
 }
+
+/* ================= AI summary ================= */
 async function fetchAISummary(paper, slug){
-  // cached JSON first
+  // 1) repo-cached JSON (optional in future)
   try{
     const r = await fetch(`data/${slug}/summaries/${paper.pmid}.json`, {cache:'no-store'});
-    if(r.ok){ const j=await r.json(); if(j && j.html) return j.html; }
-  }catch(e){}
-  if(!SUMMARY_PROXY_URL) return null;
+    if(r.ok){ const j=await r.json(); if(j && j.html) return { html:j.html }; }
+  }catch(e){ /* ignore */ }
+
+  // 2) live proxy
+  if(!SUMMARY_PROXY_URL) return { error: "No proxy URL configured" };
   try{
-    const abstractText = paper.abstract_html || 'NR';
     const prompt = [
       "You are the Chief Investigator of the INTACT2 study and are making an assessment of the paper for inclusion in a report to your trial steering group.",
       "Provide 50–100 words, plus a tiny table of primary, secondary and safety (infection/thrombosis) outcomes.",
@@ -98,18 +105,30 @@ async function fetchAISummary(paper, slug){
       `Journal/Date: ${paper.journal} / ${paper.published}`,
       `PMID: ${paper.pmid}`,
       "Abstract (HTML sections allowed):",
-      abstractText
+      paper.abstract_html || "NR"
     ].join("\n");
+
     const resp = await fetch(SUMMARY_PROXY_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({pmid: paper.pmid, prompt})
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pmid: paper.pmid, prompt })
     });
-    if(!resp.ok) return null;
-    const data = await resp.json();
-    return data && data.html ? data.html : null;
-  }catch(e){ return null; }
+
+    const text = await resp.text(); // read text to get helpful error bodies
+    let json = null;
+    try { json = JSON.parse(text); } catch { /* non-JSON error */ }
+
+    if (!resp.ok) {
+      const msg = (json && json.error) ? json.error : `HTTP ${resp.status} ${text.slice(0,200)}`;
+      return { error: msg };
+    }
+    if (!json || !json.html) return { error: "Bad JSON from proxy" };
+    return { html: json.html };
+  }catch(e){
+    return { error: e?.message || "Network error" };
+  }
 }
+
 function wireAISummaries(records, slug){
   document.querySelectorAll('details.ai-block').forEach(d=>{
     d.addEventListener('toggle', async ()=>{
@@ -119,13 +138,28 @@ function wireAISummaries(records, slug){
       const status = d.querySelector('.status');
       const content = d.querySelector('.ai-content');
       if(content.getAttribute('data-loaded')==='1') return;
+
       status.textContent = SUMMARY_PROXY_URL ? 'AI summary generating…' : 'AI summary unavailable (no proxy configured)';
-      const html = await fetchAISummary(paper, slug);
-      if(html){ status.textContent=''; content.innerHTML=html; content.setAttribute('data-loaded','1'); }
-      else{ status.textContent='AI summary unavailable or failed.'; }
+      const res = await fetchAISummary(paper, slug);
+      if(res.html){
+        status.textContent = '';
+        content.innerHTML = res.html;
+        content.setAttribute('data-loaded','1');
+      }else{
+        status.textContent = 'AI summary unavailable or failed.';
+        // Developer hint (visible in DevTools)
+        console.warn('AI summary error', { pmid, error: res.error });
+        // Optional: show the reason inline for debugging. Comment out to hide from users:
+        const err = document.createElement('div');
+        err.className = 'status';
+        err.textContent = `Troubleshooting: ${res.error || 'Unknown error'}`;
+        content.appendChild(err);
+      }
     });
   });
 }
+
+/* ================= boot ================= */
 (async function(){
   const params = new URLSearchParams(location.search);
   const slug = params.get('slug') || 'sample_ic_anaemia';
@@ -133,6 +167,7 @@ function wireAISummaries(records, slug){
   const res = await fetch(`data/${slug}/papers.json`, {cache:'no-store'});
   const data = await res.json();
   const all = data.papers || [];
+
   const state = {pop:'all', type:'all', intv:'all'};
   const tb = document.getElementById('toolbar');
   tb.innerHTML = filtersUI(state);
@@ -143,6 +178,7 @@ function wireAISummaries(records, slug){
     tb.innerHTML = filtersUI(state);
     render();
   });
+
   function render(){
     const now=new Date();
     const within=(d,days)=>{const di=new Date(d);return isFinite(di)&&((now-di)/(1000*60*60*24))<=days;};
