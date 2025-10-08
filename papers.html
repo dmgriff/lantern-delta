@@ -96,9 +96,10 @@ async function fetchAISummary(paper, slug){
   if(!SUMMARY_PROXY_URL) return { error: "No proxy URL configured" };
   try{
     const prompt = [
-      "You are the Chief Investigator of the INTACT2 study and are making an assessment of the paper for inclusion in a report to your trial steering group.",
-      "Provide 50–100 words, plus a tiny table of primary, secondary and safety (infection/thrombosis) outcomes.",
-      "Note key subgroups and finish with 1–2 sentences on relevance to INTACT2.",
+      "Summarise this paper including details such as population, country, number of patients in each group, interventions, control and outcomes"
+      "Include important statistics",
+      "Comment on the results in relation to infection and thrombosis and any other major adverse events or safety endpoints.  Be specific and include values",
+      "Are there any subgroups that respond better or worse to the intervention?",
       "Paper:",
       `Title: ${paper.title}`,
       `Authors: ${paper.authors}`,
