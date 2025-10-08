@@ -1,0 +1,45 @@
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:#fff;color:#111;font:16px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial}
+.container{max-width:900px;margin:0 auto;padding:16px}
+
+header.ld{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+a.home{font-family:ui-monospace,monospace;font-size:13px;color:#777;text-decoration:none;padding:4px 6px;border:1px solid #e6e6e6;border-radius:6px}
+a.home:hover{color:#111;border-color:#111}
+h1.brand{font-weight:700;letter-spacing:.02em;font-size:18px;margin:0}
+
+.legal{color:#666;font-size:.75rem;white-space:nowrap;margin-top:16px;overflow:hidden;text-overflow:ellipsis}
+
+/* Three tiles */
+.tiles3{display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr));margin:20px 0 8px}
+@media(max-width:560px){.tiles3{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.btn-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#111;border:1px solid #e6e6e6;border-radius:12px;padding:18px 8px}
+.btn-tile:hover{border-color:#111}
+.btn-tile .num{font-size:28px;font-weight:700;line-height:1}
+.btn-tile .lbl{font-size:12px;color:#555;margin-top:4px}
+
+/* Filters */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.btn{display:inline-block;padding:6px 10px;border:1px solid #e6e6e6;border-radius:10px;text-decoration:none;color:#111;font-size:13px}
+.btn:hover{border-color:#111}
+.btn.active{background:#111;color:#fff;border-color:#111}
+
+/* Cards */
+.card{border:1px solid #e6e6e6;border-radius:12px;padding:14px;margin:10px 0}
+.title{font-weight:700}
+.meta{color:#666;font-size:12px;margin:4px 0;display:flex;gap:8px;flex-wrap:wrap}
+.tags{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap}
+.tag{border:1px solid #ddd;border-radius:999px;padding:2px 8px;font-size:11px;color:#333}
+.links{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.linkbtn{border:1px solid #ddd;border-radius:8px;padding:4px 8px;font-size:12px;text-decoration:none;color:#111}
+.linkbtn:hover{border-color:#111}
+
+details{margin-top:6px}
+summary{cursor:pointer}
+.abs-section{padding:8px 0;border-top:1px solid #eee}
+.abs-section:first-child{border-top:0}
+.abs-heading{font-weight:600;font-size:12px;color:#333;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.abs-body{font-size:14px;color:#111}
+
+.status{font-size:12px;color:#666;margin:4px 0}

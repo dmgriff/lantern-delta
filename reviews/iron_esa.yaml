@@ -1,0 +1,17 @@
+
+slug: sample_ic_anaemia
+title: Iron & ESAs in Critical Care
+time_horizon_years: 20
+
+query: >
+  (
+    "intravenous iron" OR "ferric carboxymaltose" OR "iron derisomaltose" OR ferumoxytol
+    OR "low molecular weight iron dextran" OR "iron dextran" OR "iron sucrose" OR "ferric gluconate"
+    OR "erythropoiesis stimulating agent" OR "erythropoiesis-stimulating agent"
+    OR "methoxy polyethylene glycol-epoetin beta" OR "epoetin alfa" OR "epoetin zeta" OR "darbepoetin alfa"
+  )
+  AND (
+    randomized OR randomised OR "controlled trial" OR trial[Title]
+    OR "systematic review" OR "meta-analysis" OR "network meta-analysis"
+  )
+  AND (efficacy OR effectiveness OR safety)

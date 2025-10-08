@@ -1,0 +1,163 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>lantern delta — papers</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<main class="container">
+  <header class="ld">
+    <a class="home" href="index.html" aria-label="Home">home</a>
+    <h1 class="brand" id="brand">lantern delta</h1>
+  </header>
+
+  <div class="toolbar" id="toolbar"></div>
+  <div id="status" class="status"></div>
+  <section id="list"></section>
+</main>
+
+<script>
+const SUMMARY_PROXY_URL = ""; // optional proxy URL
+
+function esc(s){return (s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m]||m));}
+function ym(dateStr){if(!dateStr)return""; const d=new Date(dateStr); return d.toLocaleString(undefined,{year:'numeric',month:'short'});}
+
+function filtersUI(state){
+  const btn=(n,v,l)=>`<a href="#" class="btn ${state[n]===v?'active':''}" data-name="${n}" data-val="${v}">${l}</a>`;
+  return [
+    btn('pop','all','Population: All'),
+    btn('pop','icu','Population: ICU'),
+    btn('pop','other','Population: Other'),
+    btn('type','all','Design: All'),
+    btn('type','trial','Design: Trials'),
+    btn('type','systematic_review','Design: Systematic Review'),
+    btn('type','other','Design: Other'),
+    btn('intv','all','Intervention: All'),
+    btn('intv','iv_iron','Intervention: IV Iron'),
+    btn('intv','esa','Intervention: ESA'),
+    btn('intv','other','Intervention: Other')
+  ].join("\n");
+}
+function applyFilters(recs, state, view){
+  const now=new Date();
+  const within=(d,days)=>{const di=new Date(d);return isFinite(di)&&((now-di)/(1000*60*60*24))<=days;};
+  let out=recs.slice();
+  if(view==='new') out=out.filter(r=>within(r.published,7));
+  if(view==='recent') out=out.filter(r=>within(r.published,365));
+  if(state.pop!=='all') out=out.filter(r=>(r.population||'other')===state.pop);
+  if(state.type!=='all') out=out.filter(r=>(r.type||'other')===state.type);
+  if(state.intv!=='all') out=out.filter(r=>(r.intervention||'other')===state.intv);
+  return out;
+}
+function renderCard(p, slug){
+  const pmid = esc(p.pmid||"");
+  const pubmed = pmid?`https://pubmed.ncbi.nlm.nih.gov/${pmid}/`:"";
+  const full = p.doi?`https://doi.org/${esc(p.doi)}`:pubmed||"#";
+  return `
+  <article class="card" id="pmid-${pmid}">
+    <div class="title">${esc(p.title||'')}</div>
+    <div class="meta">
+      <span>${esc(p.authors||'')}</span>
+      <span>— ${esc(p.journal||'')}</span>
+      <span>— ${esc(ym(p.published))}</span>
+    </div>
+    <div class="links">
+      ${pmid?`<a class="linkbtn" href="${pubmed}" target="_blank" rel="noopener">PMID</a>`:''}
+      ${full?`<a class="linkbtn" href="${full}" target="_blank" rel="noopener">Full text</a>`:''}
+      <span class="tag">${esc(p.population||'other')}</span>
+      <span class="tag">${esc(p.type||'other')}</span>
+      <span class="tag">${esc(p.intervention||'other')}</span>
+    </div>
+    ${p.abstract_html?`<details><summary>Abstract</summary><div>${p.abstract_html}</div></details>`:''}
+    <details class="ai-block" data-pmid="${pmid}" data-slug="${esc(slug)}">
+      <summary>AI Summary</summary>
+      <div class="status">AI summary ${SUMMARY_PROXY_URL?'generating…':'unavailable (no proxy configured)'}</div>
+      <div class="ai-content"></div>
+    </details>
+  </article>`;
+}
+async function fetchAISummary(paper, slug){
+  // cached JSON first
+  try{
+    const r = await fetch(`data/${slug}/summaries/${paper.pmid}.json`, {cache:'no-store'});
+    if(r.ok){ const j=await r.json(); if(j && j.html) return j.html; }
+  }catch(e){}
+  if(!SUMMARY_PROXY_URL) return null;
+  try{
+    const abstractText = paper.abstract_html || 'NR';
+    const prompt = [
+      "You are the Chief Investigator of the INTACT2 study and are making an assessment of the paper for inclusion in a report to your trial steering group.",
+      "Provide 50–100 words, plus a tiny table of primary, secondary and safety (infection/thrombosis) outcomes.",
+      "Note key subgroups and finish with 1–2 sentences on relevance to INTACT2.",
+      "Paper:",
+      `Title: ${paper.title}`,
+      `Authors: ${paper.authors}`,
+      `Journal/Date: ${paper.journal} / ${paper.published}`,
+      `PMID: ${paper.pmid}`,
+      "Abstract (HTML sections allowed):",
+      abstractText
+    ].join("\n");
+    const resp = await fetch(SUMMARY_PROXY_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pmid: paper.pmid, prompt})
+    });
+    if(!resp.ok) return null;
+    const data = await resp.json();
+    return data && data.html ? data.html : null;
+  }catch(e){ return null; }
+}
+function wireAISummaries(records, slug){
+  document.querySelectorAll('details.ai-block').forEach(d=>{
+    d.addEventListener('toggle', async ()=>{
+      if(!d.open) return;
+      const pmid = d.getAttribute('data-pmid');
+      const paper = records.find(r => String(r.pmid)===pmid);
+      const status = d.querySelector('.status');
+      const content = d.querySelector('.ai-content');
+      if(content.getAttribute('data-loaded')==='1') return;
+      status.textContent = SUMMARY_PROXY_URL ? 'AI summary generating…' : 'AI summary unavailable (no proxy configured)';
+      const html = await fetchAISummary(paper, slug);
+      if(html){ status.textContent=''; content.innerHTML=html; content.setAttribute('data-loaded','1'); }
+      else{ status.textContent='AI summary unavailable or failed.'; }
+    });
+  });
+}
+(async function(){
+  const params = new URLSearchParams(location.search);
+  const slug = params.get('slug') || 'sample_ic_anaemia';
+  const view = (params.get('view') || 'all').toLowerCase();
+  const res = await fetch(`data/${slug}/papers.json`, {cache:'no-store'});
+  const data = await res.json();
+  const all = data.papers || [];
+  const state = {pop:'all', type:'all', intv:'all'};
+  const tb = document.getElementById('toolbar');
+  tb.innerHTML = filtersUI(state);
+  tb.addEventListener('click', (e)=>{
+    const a = e.target.closest('a.btn'); if(!a) return;
+    e.preventDefault();
+    state[a.dataset.name]=a.dataset.val;
+    tb.innerHTML = filtersUI(state);
+    render();
+  });
+  function render(){
+    const now=new Date();
+    const within=(d,days)=>{const di=new Date(d);return isFinite(di)&&((now-di)/(1000*60*60*24))<=days;};
+    let subset=all.slice();
+    if(view==='new') subset=subset.filter(r=>within(r.published,7));
+    if(view==='recent') subset=subset.filter(r=>within(r.published,365));
+    if(state.pop!=='all') subset=subset.filter(r=>(r.population||'other')===state.pop);
+    if(state.type!=='all') subset=subset.filter(r=>(r.type||'other')===state.type);
+    if(state.intv!=='all') subset=subset.filter(r=>(r.intervention||'other')===state.intv);
+    document.getElementById('status').textContent = `Viewing: ${view.toUpperCase()} • ${subset.length} of ${all.length}`;
+    document.getElementById('list').innerHTML = subset.map(p=>renderCard(p, slug)).join('');
+    wireAISummaries(subset, slug);
+  }
+  render();
+})();
+</script>
+</body>
+</html>

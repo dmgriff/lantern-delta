@@ -1,0 +1,39 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>lantern delta</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<main class="container">
+  <header class="ld">
+    <a class="home" href="index.html" aria-label="Home">home</a>
+    <h1 class="brand">lantern delta</h1>
+  </header>
+
+  <section id="tiles"></section>
+  <p class="legal">experimental &bull; AI-assisted &bull; may contain errors &bull; read the originals</p>
+</main>
+
+<script>
+(async function(){
+  const slug = "sample_ic_anaemia";
+  try{
+    const res = await fetch(`data/${slug}/summary.json`, {cache:'no-store'});
+    const s = await res.json();
+    document.getElementById('tiles').innerHTML = `
+      <section class="tiles3">
+        <a class="btn-tile" href="papers.html?slug=${slug}&view=new"><span class="num">${s.counts.new}</span><span class="lbl">New</span></a>
+        <a class="btn-tile" href="papers.html?slug=${slug}&view=recent"><span class="num">${s.counts.recent}</span><span class="lbl">Recent</span></a>
+        <a class="btn-tile" href="papers.html?slug=${slug}&view=all"><span class="num">${s.counts.all}</span><span class="lbl">All</span></a>
+      </section>`;
+  }catch(e){
+    document.getElementById('tiles').innerHTML = '<div class="status">No data yet. Run the workflow.</div>';
+  }
+})();
+</script>
+</body>
+</html>
