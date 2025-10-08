@@ -13,71 +13,69 @@
     <h1 class="brand" id="brand">lantern delta</h1>
   </header>
 
-  <!-- Subtle header row -->
+  <!-- Subhead: status + filter toggle -->
   <div class="subhead">
     <div id="status" class="status"></div>
-    <details class="filters" id="filters">
-      <summary class="filters-toggle" aria-label="Toggle filters">filters</summary>
-      <div class="filters-body" id="toolbar"></div>
-    </details>
+    <button id="filterToggle" class="filter-cta" aria-controls="filterSheet" aria-expanded="false">filters</button>
+  </div>
+
+  <!-- Inline filters (desktop) -->
+  <div class="filters-inline" id="filtersInline" role="group" aria-label="Filters">
+    <div class="filters-body" id="toolbar"></div>
+  </div>
+
+  <!-- Mobile slide-out sheet -->
+  <div id="filterSheet" class="filter-sheet" aria-hidden="true" role="dialog" aria-label="Filters">
+    <div class="filter-sheet__panel">
+      <div class="filter-sheet__header">
+        <div class="filter-sheet__title">filters</div>
+        <button class="filter-close" id="filterClose" aria-label="Close filters">✕</button>
+      </div>
+      <div class="filters-body" id="toolbarMobile"></div>
+      <div class="filter-sheet__footer">
+        <button class="chip apply" id="filterApply">apply</button>
+        <button class="chip clear" id="filterClear">clear</button>
+      </div>
+    </div>
+    <div class="filter-sheet__backdrop" id="filterBackdrop" tabindex="-1" aria-hidden="true"></div>
   </div>
 
   <section id="list"></section>
 </main>
 
 <script>
-/* ==== CONFIG: set your deployed Cloudflare Worker URL here ==== */
+/* ==== CONFIG ==== */
 const SUMMARY_PROXY_URL = "https://lantern-delta-summary.dmgriffith.workers.dev";
 
-/* ================= utility ================= */
-function esc(s){
-  return (s||'').replace(/[&<>"']/g, m => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
-  }[m] || m));
-}
-function ym(dateStr){
-  if(!dateStr) return "";
-  const d = new Date(dateStr);
-  return isNaN(d) ? (dateStr || "") : d.toLocaleString(undefined,{year:'numeric',month:'short'});
-}
+/* ==== UTIL ==== */
+function esc(s){return (s||'').replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]||m));}
+function ym(dateStr){ if(!dateStr) return ""; const d = new Date(dateStr); return isNaN(d)?(dateStr||""):d.toLocaleString(undefined,{year:'numeric',month:'short'}); }
 
-/* ================= filters ================= */
+/* ==== FILTER MODEL ==== */
 const FILTERS_DEF = [
-  { group: "pop", label: "Population", options: [
-    ["all","All"], ["icu","ICU"], ["other","Other"]
-  ]},
-  { group: "type", label: "Design", options: [
-    ["all","All"], ["trial","Trials"], ["systematic_review","Systematic Review"], ["other","Other"]
-  ]},
-  { group: "intv", label: "Intervention", options: [
-    ["all","All"], ["iv_iron","IV Iron"], ["esa","ESA"], ["other","Other"]
-  ]}
+  { group: "pop",  label: "Population",   options: [["all","All"],["icu","ICU"],["other","Other"]] },
+  { group: "type", label: "Design",       options: [["all","All"],["trial","Trials"],["systematic_review","Systematic Review"],["other","Other"]] },
+  { group: "intv", label: "Intervention", options: [["all","All"],["iv_iron","IV Iron"],["esa","ESA"],["other","Other"]] }
 ];
-
-function chip(name, val, label, active){
-  return `<a href="#" class="chip ${active?'active':''}" data-name="${name}" data-val="${val}">${label}</a>`;
+function chip(name,val,label,active){ return `<a href="#" class="chip ${active?'active':''}" data-name="${name}" data-val="${val}" role="button" aria-pressed="${active}">${label}</a>`; }
+function groupUI(group,state){
+  const items = group.options.map(([v,l])=>chip(group.group, v, l, state[group.group]===v)).join("");
+  return `<div class="chipgroup"><span class="chiplabel">${group.label}</span>${items}</div>`;
 }
-
-function filtersUI(state){
-  return FILTERS_DEF.map(group=>{
-    const items = group.options.map(([val,label]) => chip(group.group, val, label, state[group.group]===val)).join("");
-    return `<div class="chipgroup"><span class="chiplabel">${group.label}</span>${items}</div>`;
-  }).join("");
-}
-
+function filtersUI(state){ return FILTERS_DEF.map(g=>groupUI(g,state)).join(""); }
 function applyFilters(recs, state, view){
   const now=new Date();
   const within=(d,days)=>{const di=new Date(d);return isFinite(di)&&((now-di)/(1000*60*60*24))<=days;};
   let out=recs.slice();
   if(view==='new') out=out.filter(r=>within(r.published,7));
   if(view==='recent') out=out.filter(r=>within(r.published,365));
-  if(state.pop!=='all') out=out.filter(r=>(r.population||'other')===state.pop);
+  if(state.pop!=='all')  out=out.filter(r=>(r.population||'other')===state.pop);
   if(state.type!=='all') out=out.filter(r=>(r.type||'other')===state.type);
   if(state.intv!=='all') out=out.filter(r=>(r.intervention||'other')===state.intv);
   return out;
 }
 
-/* ================= cards ================= */
+/* ==== CARDS ==== */
 function renderCard(p, slug){
   const pmid = esc(p.pmid||"");
   const pubmed = pmid?`https://pubmed.ncbi.nlm.nih.gov/${pmid}/`:"";
@@ -85,11 +83,7 @@ function renderCard(p, slug){
   return `
   <article class="card" id="pmid-${pmid}">
     <div class="title">${esc(p.title||'')}</div>
-    <div class="meta">
-      <span>${esc(p.authors||'')}</span>
-      <span>— ${esc(p.journal||'')}</span>
-      <span>— ${esc(ym(p.published))}</span>
-    </div>
+    <div class="meta"><span>${esc(p.authors||'')}</span><span>— ${esc(p.journal||'')}</span><span>— ${esc(ym(p.published))}</span></div>
     <div class="links">
       ${pmid?`<a class="linkbtn" href="${pubmed}" target="_blank" rel="noopener">PMID</a>`:''}
       ${full?`<a class="linkbtn" href="${full}" target="_blank" rel="noopener">Full text</a>`:''}
@@ -106,56 +100,37 @@ function renderCard(p, slug){
   </article>`;
 }
 
-/* ================= AI summary ================= */
-// Single-flight guard to avoid duplicate calls
+/* ==== AI SUMMARY ==== */
 const _aiInflight = new Set();
-
 async function fetchAISummary(paper, slug){
-  // Try cached JSON (if you later write it)
   try{
     const r = await fetch(`data/${slug}/summaries/${paper.pmid}.json`, {cache:'no-store'});
     if(r.ok){ const j=await r.json(); if(j && j.html) return { html:j.html, source:'cache' }; }
   }catch(e){}
-
-  if(!SUMMARY_PROXY_URL) return { error: "No proxy URL configured" };
+  if(!SUMMARY_PROXY_URL) return { error:"No proxy URL configured" };
   try{
-    const plainAbs = (paper.abstract_html||"").replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').slice(0, 2500);
-
-    // Prose-centric prompt (no headings, still includes PICO, ROB, nums+95% CI, safety, subgroups, INTACT2 relevance)
+    const plainAbs = (paper.abstract_html||"").replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').slice(0,2500);
     const prompt = [
       "Write a concise, fluent narrative summary (80–140 words) of this clinical trial or systematic review.",
-      "Include: population, intervention, comparator, primary outcome, and a one-line risk of bias comment (most important source).",
-      "State the primary estimate with 95% CI, plus key secondary outcomes and safety (infection, thrombosis) with numbers where available.",
-      "Mention notable subgroups if reported, and finish with one sentence on relevance to the INTACT2 trial.",
+      "Include: population, intervention, comparator, primary outcome, a one-line risk-of-bias comment (main source),",
+      "state the primary estimate with 95% CI, key secondary outcomes, and safety (infection, thrombosis) with numbers if available.",
+      "Mention notable subgroups if reported, and end with one sentence on relevance to the INTACT2 trial.",
       "Avoid headings or bullet points; use tight prose.",
-      "",
-      `Title: ${paper.title}`,
-      `Authors: ${paper.authors}`,
-      `Journal/Date: ${paper.journal} / ${paper.published}`,
-      `PMID: ${paper.pmid}`,
-      "Abstract (plain, trimmed):",
-      plainAbs || "NR"
+      "", `Title: ${paper.title}`, `Authors: ${paper.authors}`,
+      `Journal/Date: ${paper.journal} / ${paper.published}`, `PMID: ${paper.pmid}`,
+      "Abstract (plain, trimmed):", plainAbs || "NR"
     ].join("\n");
 
     const resp = await fetch(SUMMARY_PROXY_URL, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ pmid: paper.pmid, prompt })
     });
-
-    const text = await resp.text();
-    let json = null;
-    try { json = JSON.parse(text); } catch {}
-    if (!resp.ok) {
-      const msg = (json && json.error) ? json.error : `HTTP ${resp.status} ${text.slice(0,200)}`;
-      return { error: msg };
-    }
-    if (!json || !json.html) return { error: "Bad JSON from proxy" };
+    const text = await resp.text(); let json=null; try{ json=JSON.parse(text); }catch{}
+    if(!resp.ok) return { error: (json && json.error) ? json.error : `HTTP ${resp.status} ${text.slice(0,200)}` };
+    if(!json || !json.html) return { error:"Bad JSON from proxy" };
     return { html: json.html, source:'proxy' };
-  }catch(e){
-    return { error: e?.message || "Network error" };
-  }
+  }catch(e){ return { error: e?.message || "Network error" }; }
 }
-
 function wireAISummaries(records, slug){
   document.querySelectorAll('details.ai-block').forEach(d=>{
     d.addEventListener('toggle', async ()=>{
@@ -165,19 +140,15 @@ function wireAISummaries(records, slug){
       const status = d.querySelector('.status');
       const content = d.querySelector('.ai-content');
       if(!paper){ status.textContent = "Paper not found"; return; }
-      if(content.getAttribute('data-loaded')==='1') return;
-      if(_aiInflight.has(pmid)) return;
+      if(content.getAttribute('data-loaded')==='1' || _aiInflight.has(pmid)) return;
 
       status.textContent = SUMMARY_PROXY_URL ? 'AI summary generating…' : 'AI summary unavailable (no proxy configured)';
       _aiInflight.add(pmid);
       const res = await fetchAISummary(paper, slug);
       _aiInflight.delete(pmid);
 
-      if(res.html){
-        status.textContent = '';
-        content.innerHTML = res.html;
-        content.setAttribute('data-loaded','1');
-      }else{
+      if(res.html){ status.textContent=''; content.innerHTML=res.html; content.setAttribute('data-loaded','1'); }
+      else{
         status.textContent = 'AI summary unavailable or failed.';
         console.warn('AI summary error', { pmid, error: res.error });
         const err = document.createElement('div');
@@ -189,7 +160,7 @@ function wireAISummaries(records, slug){
   });
 }
 
-/* ================= boot ================= */
+/* ==== BOOT ==== */
 (async function(){
   try{
     const params = new URLSearchParams(location.search);
@@ -197,23 +168,27 @@ function wireAISummaries(records, slug){
     const view = (params.get('view') || 'all').toLowerCase();
 
     const r = await fetch(`data/${slug}/papers.json`, {cache:'no-store'});
-    if(!r.ok){
-      document.getElementById('status').textContent = "No data yet. Run the workflow.";
-      return;
-    }
+    if(!r.ok){ document.getElementById('status').textContent = "No data yet. Run the workflow."; return; }
     const data = await r.json();
     const all = data.papers || [];
 
-    // State + toolbar
-    const state = {pop:'all', type:'all', intv:'all'};
-    const tb = document.getElementById('toolbar');
-    tb.innerHTML = filtersUI(state);
-    tb.addEventListener('click', (e)=>{
+    const state = { pop:'all', type:'all', intv:'all' };
+    const toolbar = document.getElementById('toolbar');
+    const toolbarMobile = document.getElementById('toolbarMobile');
+    const renderFilters = ()=>{
+      const html = FILTERS_DEF.map(g=>groupUI(g,state)).join("");
+      toolbar.innerHTML = html;
+      toolbarMobile.innerHTML = html;
+    };
+    const onFilterClick = (e)=>{
       const a = e.target.closest('a.chip'); if(!a) return;
       e.preventDefault();
-      state[a.dataset.name]=a.dataset.val;
-      tb.innerHTML = filtersUI(state);
+      state[a.dataset.name] = a.dataset.val;
+      renderFilters();
       render();
+    };
+    document.addEventListener('click', (e)=>{
+      if (e.target.closest('#toolbar') || e.target.closest('#toolbarMobile')) onFilterClick(e);
     });
 
     function render(){
@@ -222,7 +197,7 @@ function wireAISummaries(records, slug){
       let subset=all.slice();
       if(view==='new') subset=subset.filter(r=>within(r.published,7));
       if(view==='recent') subset=subset.filter(r=>within(r.published,365));
-      if(state.pop!=='all') subset=subset.filter(r=>(r.population||'other')===state.pop);
+      if(state.pop!=='all')  subset=subset.filter(r=>(r.population||'other')===state.pop);
       if(state.type!=='all') subset=subset.filter(r=>(r.type||'other')===state.type);
       if(state.intv!=='all') subset=subset.filter(r=>(r.intervention||'other')===state.intv);
       document.getElementById('status').textContent = `Viewing: ${view.toUpperCase()} • ${subset.length} of ${all.length}`;
@@ -230,15 +205,34 @@ function wireAISummaries(records, slug){
       wireAISummaries(subset, slug);
     }
 
-    // Collapse filters by default on narrow screens
-    const f = document.getElementById('filters');
-    if (window.matchMedia("(max-width: 720px)").matches) f.removeAttribute('open');
+    /* slide-out sheet behaviors (mobile) */
+    const sheet = document.getElementById('filterSheet');
+    const toggleBtn = document.getElementById('filterToggle');
+    const closeBtn = document.getElementById('filterClose');
+    const applyBtn = document.getElementById('filterApply');
+    const clearBtn = document.getElementById('filterClear');
+    const backdrop = document.getElementById('filterBackdrop');
 
+    function openSheet(){ sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false'); toggleBtn.setAttribute('aria-expanded','true'); }
+    function closeSheet(){ sheet.classList.remove('open'); sheet.setAttribute('aria-hidden','true'); toggleBtn.setAttribute('aria-expanded','false'); }
+    toggleBtn.addEventListener('click', ()=> openSheet());
+    closeBtn.addEventListener('click', ()=> closeSheet());
+    backdrop.addEventListener('click', ()=> closeSheet());
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && sheet.classList.contains('open')) closeSheet(); });
+    applyBtn.addEventListener('click', ()=>{ closeSheet(); render(); });
+    clearBtn.addEventListener('click', ()=>{
+      Object.assign(state,{pop:'all',type:'all',intv:'all'});
+      renderFilters();
+    });
+
+    // init
+    renderFilters();
     render();
+
+    // Hide inline filters on small screens; CSS handles layout.
   }catch(err){
     console.error("Fatal render error:", err);
-    const s = document.getElementById('status');
-    s.textContent = "Render error. Open console for details.";
+    document.getElementById('status').textContent = "Render error. Open console for details.";
   }
 })();
 </script>
