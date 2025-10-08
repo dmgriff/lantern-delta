@@ -1,1 +1,72 @@
 
+name: lantern-delta
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many PubMed records to fetch"
+        required: false
+        default: "60"
+      dry_run:
+        description: "Dry run (skip network fetch)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Build review data (PubMed only; no AI)
+        env:
+          LANTERN_SUMMARY_LIMIT: "0"
+        run: |
+          LIMIT_INPUT="${{ github.event.inputs.limit }}"
+          DRY_INPUT="${{ github.event.inputs.dry_run }}"
+          LIMIT="${LIMIT_INPUT:-60}"
+          DRY_FLAG=""
+          if [ "${DRY_INPUT}" = "true" ]; then DRY_FLAG="--dry-run"; fi
+
+          python scripts/run_review.py             --spec reviews/iron_esa.yaml             --root .             ${DRY_FLAG}             --limit "${LIMIT}"
+
+          echo "::group::Generated data/"
+          find data -maxdepth 3 -type f -print || true
+          echo "::endgroup::"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
