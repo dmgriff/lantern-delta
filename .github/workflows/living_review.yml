@@ -7,7 +7,7 @@ on:
       limit:
         description: "How many PubMed records to fetch"
         required: false
-        default: "60"
+        default: "500"
       dry_run:
         description: "Dry run (skip network fetch)"
         required: false
