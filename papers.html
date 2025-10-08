@@ -20,11 +20,23 @@
 
 <script>
 /* ==== CONFIG: set your deployed Cloudflare Worker URL here ==== */
-const SUMMARY_PROXY_URL = "https://lantern-delta-summary.dmgriffith.workers.dev"; // e.g. "https://lantern-delta-summary.YOURNAME.workers.dev"
+const SUMMARY_PROXY_URL = "https://lantern-delta-summary.dmgriffith.workers.dev";
 
 /* ================= utility ================= */
-function esc(s){return (s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m]||m));}
-function ym(dateStr){if(!dateStr)return""; const d=new Date(dateStr); return d.toLocaleString(undefined,{year:'numeric',month:'short'});}
+function esc(s){
+  return (s||'').replace(/[&<>"']/g, m => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    "\"":"&quot;",
+    "'":"&#39;"
+  }[m] || m));
+}
+function ym(dateStr){
+  if(!dateStr) return "";
+  const d = new Date(dateStr);
+  return d.toLocaleString(undefined,{year:'numeric',month:'short'});
+}
 
 /* ================= filters ================= */
 function filtersUI(state){
@@ -96,9 +108,9 @@ async function fetchAISummary(paper, slug){
   if(!SUMMARY_PROXY_URL) return { error: "No proxy URL configured" };
   try{
     const prompt = [
-      "Summarise this paper including details such as population, country, number of patients in each group, interventions, control and outcomes"
+      "Summarise this paper including details such as population, country, number of patients in each group, interventions, control and outcomes",
       "Include important statistics",
-      "Comment on the results in relation to infection and thrombosis and any other major adverse events or safety endpoints.  Be specific and include values",
+      "Comment on the results in relation to infection and thrombosis and any other major adverse events or safety endpoints. Be specific and include values",
       "Are there any subgroups that respond better or worse to the intervention?",
       "Paper:",
       `Title: ${paper.title}`,
@@ -148,9 +160,7 @@ function wireAISummaries(records, slug){
         content.setAttribute('data-loaded','1');
       }else{
         status.textContent = 'AI summary unavailable or failed.';
-        // Developer hint (visible in DevTools)
         console.warn('AI summary error', { pmid, error: res.error });
-        // Optional: show the reason inline for debugging. Comment out to hide from users:
         const err = document.createElement('div');
         err.className = 'status';
         err.textContent = `Troubleshooting: ${res.error || 'Unknown error'}`;
