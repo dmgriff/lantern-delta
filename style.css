@@ -14,25 +14,97 @@ h1.brand{font-weight:700;letter-spacing:.02em;font-size:18px;margin:0}
 .status{font-size:12px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* filters */
-.filters{border:0;padding:0}
-.filters[open]{}
-.filters-toggle{
-  display:inline-flex;align-items:center;gap:6px;
-  font-size:12px;color:#555;border:1px solid #e6e6e6;border-radius:999px;
-  padding:6px 10px;cursor:pointer;user-select:none;
+.filters {
+  border: 0;
+  padding: 0;
 }
-.filters-toggle::-webkit-details-marker{display:none}
-.filters-body{margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
 
-.chipgroup{display:flex;align-items:center;gap:6px}
-.chiplabel{font-size:11px;color:#777}
-.chip{
-  display:inline-block;font-size:12px;color:#444;text-decoration:none;
-  border:1px solid #e6e6e6;border-radius:999px;padding:5px 9px;
+.filters-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  border: 1px solid #eaeaea;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #fafafa;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
 }
-.chip:hover{border-color:#bbb;color:#111}
-.chip.active{background:#111;color:#fff;border-color:#111}
+.filters-toggle:hover {
+  color: #111;
+  border-color: #ccc;
+}
+.filters-toggle::-webkit-details-marker {
+  display: none;
+}
 
+.filters-body {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px 10px;
+  padding: 10px 0;
+  border-top: 1px solid #f1f1f1;
+}
+
+/* Each filter group */
+.chipgroup {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chiplabel {
+  font-size: 12px;
+  color: #888;
+  font-weight: 500;
+  margin-right: 2px;
+}
+
+/* Chips (filter buttons) */
+.chip {
+  display: inline-block;
+  font-size: 13px;
+  color: #444;
+  text-decoration: none;
+  border: 1px solid #e6e6e6;
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: #fff;
+  line-height: 1.2;
+  transition: all 0.15s ease-in-out;
+}
+.chip:hover {
+  border-color: #bbb;
+  background: #fafafa;
+  color: #000;
+}
+.chip.active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+/* Responsive: filters flow elegantly on narrow screens */
+@media (max-width: 720px) {
+  .filters-body {
+    justify-content: flex-start;
+    gap: 8px 6px;
+    border-top: none;
+    padding-top: 4px;
+  }
+  .chip {
+    font-size: 12px;
+    padding: 4px 10px;
+  }
+}
+  
 /* tiles (home) — left here so shared CSS works if reused */
 .tiles3{display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr));margin:20px 0 8px}
 @media(max-width:560px){.tiles3{grid-template-columns:repeat(3,minmax(0,1fr))}}
