@@ -15,28 +15,15 @@ h1.brand{font-weight:700;letter-spacing:.02em;font-size:18px;margin:0}
 
 /* ---- HOME / REVIEW PAGE TILES ---- */
 .tiles3{
-  display:grid;
-  /* robust, fluid grid that never collapses awkwardly */
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:12px;
-  margin:20px 0 8px;
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;margin:20px 0 8px
 }
-@media (max-width:780px){
-  /* still 3 across but fluid width */
-  .tiles3{grid-template-columns:repeat(3,minmax(0,1fr))}
-}
-@media (max-width:520px){
-  /* allow graceful wrap to two columns on very small phones */
-  .tiles3{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-@media (max-width:360px){
-  .tiles3{grid-template-columns:1fr}
-}
+@media (max-width:520px){.tiles3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:360px){.tiles3{grid-template-columns:1fr}}
 .btn-tile{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   text-decoration:none;color:#111;border:1px solid #e6e6e6;border-radius:12px;
-  padding:18px 8px;background:#fff;transition:border-color .15s ease;
-  min-height:84px;
+  padding:18px 8px;background:#fff;transition:border-color .15s ease;min-height:84px
 }
 .btn-tile:hover{border-color:#111}
 .btn-tile .num{font-size:28px;font-weight:700;line-height:1}
@@ -47,8 +34,7 @@ h1.brand{font-weight:700;letter-spacing:.02em;font-size:18px;margin:0}
 /* ---- FILTERS (papers page) ---- */
 .filter-cta{
   font-size:12px;color:#555;border:1px solid #eaeaea;border-radius:999px;
-  padding:6px 12px;background:#fafafa;cursor:pointer;user-select:none;
-  transition:all .2s ease;
+  padding:6px 12px;background:#fafafa;cursor:pointer;user-select:none;transition:all .2s ease
 }
 .filter-cta:hover{color:#111;border-color:#ccc}
 
@@ -65,24 +51,32 @@ h1.brand{font-weight:700;letter-spacing:.02em;font-size:18px;margin:0}
 .chip{
   display:inline-block;font-size:12px;color:#444;text-decoration:none;
   border:1px solid #e6e6e6;border-radius:999px;padding:6px 12px;background:#fff;
-  line-height:1.2;transition:all .15s ease-in-out;
+  line-height:1.2;transition:all .15s ease-in-out
 }
 .chip:hover{border-color:#bbb;background:#fafafa;color:#000}
 .chip.active{background:#111;color:#fff;border-color:#111}
 .chip.apply{background:#111;color:#fff;border-color:#111}
 .chip.clear{background:#fff;color:#444}
 
-/* slide-out sheet (mobile filters) */
-.filter-sheet{position:fixed;inset:0;pointer-events:none}
+/* ---- MOBILE SLIDE-OUT SHEET ---- */
+.filter-sheet{
+  position:fixed;inset:0;pointer-events:none;z-index:990 /* under panel */;
+}
 .filter-sheet.open{pointer-events:auto}
 .filter-sheet__backdrop{
-  position:absolute;inset:0;background:rgba(17,17,17,.28);opacity:0;transition:opacity .2s ease;backdrop-filter:saturate(120%) blur(2px)
+  position:absolute;inset:0;background:rgba(17,17,17,.28);
+  opacity:0;transition:opacity .2s ease;
+  /* keep backdrop under the panel to avoid intercepting taps */
+  z-index:990;
 }
 .filter-sheet.open .filter-sheet__backdrop{opacity:1}
 .filter-sheet__panel{
-  position:absolute;inset:auto 0 0 0;background:#fff;border-top-left-radius:14px;border-top-right-radius:14px;
-  box-shadow:0 -10px 30px rgba(0,0,0,.06);transform:translateY(20px);opacity:0;transition:transform .22s ease, opacity .22s ease;
-  padding:14px 16px 12px;max-height:70vh;overflow:auto
+  position:absolute;left:0;right:0;bottom:0;background:#fff;
+  border-top-left-radius:14px;border-top-right-radius:14px;
+  box-shadow:0 -10px 30px rgba(0,0,0,.08);
+  transform:translateY(24px);opacity:0;transition:transform .22s ease, opacity .22s ease;
+  padding:14px 16px 12px;max-height:70vh;overflow:auto;
+  z-index:1000; /* above backdrop */
 }
 .filter-sheet.open .filter-sheet__panel{transform:translateY(0);opacity:1}
 @media (min-width: 821px){ .filter-sheet{display:none} }
