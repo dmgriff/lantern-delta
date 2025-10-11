@@ -10,7 +10,8 @@
 <main class="container">
   <header class="ld">
     <a class="home" href="index.html" aria-label="Home">home</a>
-    <h1 class="brand" id="brand">lantern delta</h1>
+    <a class="brand" href="index.html" aria-label="Lantern Delta">lantern delta</a>
+    <div class="review-id" id="reviewId" aria-live="polite"></div>
   </header>
 
   <!-- Subhead: sticky status + search + filter toggle -->
@@ -53,7 +54,7 @@ const SUMMARY_PROXY_URL = "https://lantern-delta-summary.dmgriffith.workers.dev"
 /* ==== UTIL ==== */
 const $ = sel => document.querySelector(sel);
 function esc(s){return (s||'').replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]||m));}
-function ym(dateStr){ if(!dateStr) return ""; const d = new Date(dateStr); return isNaN(d)?(dateStr||""):d.toLocaleString(undefined,{year:'numeric',month:'short'}); }
+function ym(dateStr){ if(!dateStr) return ""; const d=new Date(dateStr); return isNaN(d)?(dateStr||""):d.toLocaleString(undefined,{year:'numeric',month:'short'}); }
 function setQuery(k,v){ const u=new URL(location.href); if(v==null||v==='') u.searchParams.delete(k); else u.searchParams.set(k,v); history.replaceState(null,'',u.toString()); }
 function getQuery(k, fallback=''){ const u=new URL(location.href); return u.searchParams.get(k) || fallback; }
 
@@ -184,11 +185,37 @@ function wireAISummaries(records, slug){
 /* ==== BOOT ==== */
 (async function(){
   try{
-    const params = new URLSearchParams(location.search);
     const slug = getQuery('slug','sample_ic_anaemia');
     const view = getQuery('view','all').toLowerCase();
     const qInput = $('#q');
 
+    // Identify the review (meta -> title; fallback to papers.json.title; else slug)
+    async function resolveReviewTitle(){
+      // Try meta.json
+      try{
+        const m = await fetch(`data/${slug}/meta.json`, {cache:'no-store'});
+        if(m.ok){
+          const j = await m.json();
+          if(j && (j.title || j.name)) return j.title || j.name;
+        }
+      }catch(e){}
+      // Fallback to papers.json
+      try{
+        const p = await fetch(`data/${slug}/papers.json`, {cache:'no-store'});
+        if(p.ok){
+          const j = await p.json();
+          if(j && j.title) return j.title;
+        }
+      }catch(e){}
+      return slug;
+    }
+    const reviewTitle = await resolveReviewTitle();
+    const rid = $('#reviewId');
+    rid.textContent = `Review: ${reviewTitle}`;
+    // Update tab title to include review
+    document.title = `lantern delta — ${reviewTitle}`;
+
+    // Load papers
     const r=await fetch(`data/${slug}/papers.json`,{cache:'no-store'});
     if(!r.ok){ $('#status').textContent="No data yet. Run the workflow."; return; }
     const data=await r.json(); const all=data.papers||[];
@@ -215,7 +242,7 @@ function wireAISummaries(records, slug){
       state[a.dataset.name]=a.dataset.val;
       setQuery(a.dataset.name, a.dataset.val);
       renderFilters();
-      if (window.matchMedia('(min-width: 821px)').matches) render();
+      if (window.matchMedia('(min-width: 821px)').matches) render(); // live apply on desktop
     }
     document.addEventListener('click',(e)=>{
       if(e.target.closest('#toolbar')||e.target.closest('#toolbarMobile')) onFilterClick(e);
@@ -226,7 +253,7 @@ function wireAISummaries(records, slug){
     }
     function render(){
       const subset = filtered();
-      $('#status').textContent = `Viewing: ${view.toUpperCase()} • ${subset.length} of ${all.length}`;
+      $('#status').textContent = `Viewing: ${reviewTitle} • ${view.toUpperCase()} • ${subset.length} of ${all.length}`;
       $('#list').innerHTML = subset.map(p=>renderCard(p, slug)).join('');
       wireAISummaries(subset, slug);
       setQuery('q', qInput.value.trim() || null);
@@ -237,12 +264,14 @@ function wireAISummaries(records, slug){
       }
     }
 
+    // Search debounce
     let t=null;
     qInput.addEventListener('input', ()=>{
       clearTimeout(t);
       t = setTimeout(()=>{ renderFilters(); render(); }, 150);
     });
 
+    // Mobile sheet wiring
     const sheet=$('#filterSheet'), toggleBtn=$('#filterToggle'), closeBtn=$('#filterClose'), applyBtn=$('#filterApply'), clearBtn=$('#filterClear'), backdrop=$('#filterBackdrop');
     function openSheet(){ sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false'); toggleBtn.setAttribute('aria-expanded','true'); }
     function closeSheet(){ sheet.classList.remove('open'); sheet.setAttribute('aria-hidden','true'); toggleBtn.setAttribute('aria-expanded','false'); }
@@ -254,6 +283,7 @@ function wireAISummaries(records, slug){
     applyBtn.addEventListener('click', ()=>{ closeSheet(); render(); });
     clearBtn.addEventListener('click', ()=>{ Object.assign(state,{pop:'all',type:'all',intv:'all'}); renderFilters(); });
 
+    // init
     renderFilters();
     render();
 
