@@ -13,15 +13,21 @@
     <h1 class="brand" id="brand">lantern delta</h1>
   </header>
 
-  <div class="subhead">
-    <div id="status" class="status"></div>
-    <button id="filterToggle" class="filter-cta" aria-controls="filterSheet" aria-expanded="false">filters</button>
+  <!-- Subhead: sticky status + search + filter toggle -->
+  <div class="subhead sticky">
+    <div class="status" id="status">Loading…</div>
+    <div class="tools">
+      <input id="q" class="q" type="search" placeholder="Search title / author / journal" aria-label="Search papers"/>
+      <button id="filterToggle" class="filter-cta" aria-controls="filterSheet" aria-expanded="false">filters</button>
+    </div>
   </div>
 
+  <!-- Inline filters (desktop) -->
   <div class="filters-inline" id="filtersInline" role="group" aria-label="Filters">
     <div class="filters-body" id="toolbar"></div>
   </div>
 
+  <!-- Mobile slide-out sheet -->
   <div id="filterSheet" class="filter-sheet" aria-hidden="true" role="dialog" aria-label="Filters">
     <div class="filter-sheet__panel">
       <div class="filter-sheet__header">
@@ -41,21 +47,33 @@
 </main>
 
 <script>
+/* ==== CONFIG ==== */
 const SUMMARY_PROXY_URL = "https://lantern-delta-summary.dmgriffith.workers.dev";
 
+/* ==== UTIL ==== */
+const $ = sel => document.querySelector(sel);
 function esc(s){return (s||'').replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]||m));}
-function ym(dateStr){ if(!dateStr) return ""; const d=new Date(dateStr); return isNaN(d)?(dateStr||""):d.toLocaleString(undefined,{year:'numeric',month:'short'}); }
+function ym(dateStr){ if(!dateStr) return ""; const d = new Date(dateStr); return isNaN(d)?(dateStr||""):d.toLocaleString(undefined,{year:'numeric',month:'short'}); }
+function setQuery(k,v){ const u=new URL(location.href); if(v==null||v==='') u.searchParams.delete(k); else u.searchParams.set(k,v); history.replaceState(null,'',u.toString()); }
+function getQuery(k, fallback=''){ const u=new URL(location.href); return u.searchParams.get(k) || fallback; }
 
+/* ==== FILTER MODEL ==== */
 const FILTERS_DEF = [
-  { group:"pop",  label:"Population",   options:[["all","All"],["icu","ICU"],["other","Other"]] },
-  { group:"type", label:"Design",       options:[["all","All"],["trial","Trials"],["systematic_review","Systematic Review"],["other","Other"]] },
-  { group:"intv", label:"Intervention", options:[["all","All"],["iv_iron","IV Iron"],["esa","ESA"],["other","Other"]] }
+  { group: "pop",  label: "Population",   options: [["all","All"],["icu","ICU"],["other","Other"]] },
+  { group: "type", label: "Design",       options: [["all","All"],["trial","Trials"],["systematic_review","Systematic Review"],["other","Other"]] },
+  { group: "intv", label: "Intervention", options: [["all","All"],["iv_iron","IV Iron"],["esa","ESA"],["other","Other"]] }
 ];
-function chip(name,val,label,active){ return `<a href="#" class="chip ${active?'active':''}" data-name="${name}" data-val="${val}" role="button" aria-pressed="${active}">${label}</a>`; }
-function groupUI(group,state){ const items=group.options.map(([v,l])=>chip(group.group,v,l,state[group.group]===v)).join(""); return `<div class="chipgroup"><span class="chiplabel">${group.label}</span>${items}</div>`; }
-function filtersHTML(state){ return FILTERS_DEF.map(g=>groupUI(g,state)).join(""); }
+function chip(name,val,label,active,count){
+  const c = (typeof count==='number') ? ` <span class="chipcount">${count}</span>` : '';
+  return `<a href="#" class="chip ${active?'active':''}" data-name="${name}" data-val="${val}" role="button" aria-pressed="${active}">${label}${c}</a>`;
+}
+function groupUI(group,state,counts){
+  const items = group.options.map(([v,l]) => chip(group.group, v, l, state[group.group]===v, counts[group.group]?.[v])).join("");
+  return `<div class="chipgroup"><span class="chiplabel">${group.label}</span>${items}</div>`;
+}
+function filtersUI(state, counts){ return FILTERS_DEF.map(g=>groupUI(g,state,counts||{})).join(""); }
 
-function applyFilters(recs, state, view){
+function applyFiltersBase(recs, state, view){
   const now=new Date();
   const within=(d,days)=>{const di=new Date(d);return isFinite(di)&&((now-di)/(1000*60*60*24))<=days;};
   let out=recs.slice();
@@ -66,7 +84,33 @@ function applyFilters(recs, state, view){
   if(state.intv!=='all') out=out.filter(r=>(r.intervention||'other')===state.intv);
   return out;
 }
+function textMatch(p, needle){
+  if(!needle) return true;
+  const hay = [p.title, p.authors, p.journal].join(" ").toLowerCase();
+  return hay.includes(needle.toLowerCase());
+}
+function applyFilters(recs, state, view, q){
+  return applyFiltersBase(recs, state, view).filter(p => textMatch(p, q));
+}
+function computeCounts(recs, view, q){
+  const base = recs.filter(p => textMatch(p, q));
+  const groups = { pop:{}, type:{}, intv:{} };
+  const add = (g,k)=>{ groups[g][k]=(groups[g][k]||0)+1; };
+  const now=new Date();
+  const within=(d,days)=>{const di=new Date(d);return isFinite(di)&&((now-di)/(1000*60*60*24))<=days;};
+  const pool = (view==='new')?base.filter(r=>within(r.published,7)) : (view==='recent')?base.filter(r=>within(r.published,365)) : base;
+  for(const p of pool){
+    add('pop', (p.population||'other'));
+    add('type',(p.type||'other'));
+    add('intv',(p.intervention||'other'));
+  }
+  groups.pop.all = pool.length;
+  groups.type.all = pool.length;
+  groups.intv.all = pool.length;
+  return groups;
+}
 
+/* ==== CARDS ==== */
 function renderCard(p, slug){
   const pmid = esc(p.pmid||"");
   const pubmed = pmid?`https://pubmed.ncbi.nlm.nih.gov/${pmid}/`:"";
@@ -91,6 +135,7 @@ function renderCard(p, slug){
   </article>`;
 }
 
+/* ==== AI SUMMARY ==== */
 const _aiInflight = new Set();
 async function fetchAISummary(paper, slug){
   try{
@@ -136,83 +181,85 @@ function wireAISummaries(records, slug){
   });
 }
 
+/* ==== BOOT ==== */
 (async function(){
   try{
-    const params=new URLSearchParams(location.search);
-    const slug=params.get('slug')||'sample_ic_anaemia';
-    const view=(params.get('view')||'all').toLowerCase();
+    const params = new URLSearchParams(location.search);
+    const slug = getQuery('slug','sample_ic_anaemia');
+    const view = getQuery('view','all').toLowerCase();
+    const qInput = $('#q');
 
     const r=await fetch(`data/${slug}/papers.json`,{cache:'no-store'});
-    if(!r.ok){ document.getElementById('status').textContent="No data yet. Run the workflow."; return; }
+    if(!r.ok){ $('#status').textContent="No data yet. Run the workflow."; return; }
     const data=await r.json(); const all=data.papers||[];
 
-    const state={pop:'all',type:'all',intv:'all'};
-    const toolbar=document.getElementById('toolbar');
-    const toolbarMobile=document.getElementById('toolbarMobile');
+    const state = {
+      pop:  getQuery('pop','all'),
+      type: getQuery('type','all'),
+      intv: getQuery('intv','all'),
+    };
+    qInput.value = getQuery('q','');
+
+    const toolbar = $('#toolbar');
+    const toolbarMobile = $('#toolbarMobile');
 
     function renderFilters(){
-      const html=filtersHTML(state);
-      toolbar.innerHTML=html;
-      toolbarMobile.innerHTML=html;
+      const counts = computeCounts(all, view, qInput.value.trim());
+      const html = filtersUI(state, counts);
+      toolbar.innerHTML = html;
+      toolbarMobile.innerHTML = html;
     }
     function onFilterClick(e){
       const a=e.target.closest('a.chip'); if(!a) return;
       e.preventDefault();
       state[a.dataset.name]=a.dataset.val;
+      setQuery(a.dataset.name, a.dataset.val);
       renderFilters();
+      if (window.matchMedia('(min-width: 821px)').matches) render();
     }
     document.addEventListener('click',(e)=>{
       if(e.target.closest('#toolbar')||e.target.closest('#toolbarMobile')) onFilterClick(e);
     });
 
-    function applyAndRender(){
-      document.getElementById('status').textContent=`Applying filters…`;
-      render(); // re-render list
+    function filtered(){
+      return applyFilters(all, state, view, qInput.value.trim());
     }
-
     function render(){
-      const now=new Date();
-      const within=(d,days)=>{const di=new Date(d);return isFinite(di)&&((now-di)/(1000*60*60*24))<=days;};
-      let subset=all.slice();
-      if(view==='new') subset=subset.filter(r=>within(r.published,7));
-      if(view==='recent') subset=subset.filter(r=>within(r.published,365));
-      if(state.pop!=='all')  subset=subset.filter(r=>(r.population||'other')===state.pop);
-      if(state.type!=='all') subset=subset.filter(r=>(r.type||'other')===state.type);
-      if(state.intv!=='all') subset=subset.filter(r=>(r.intervention||'other')===state.intv);
-      document.getElementById('status').textContent=`Viewing: ${view.toUpperCase()} • ${subset.length} of ${all.length}`;
-      document.getElementById('list').innerHTML=subset.map(p=>renderCard(p, slug)).join('');
+      const subset = filtered();
+      $('#status').textContent = `Viewing: ${view.toUpperCase()} • ${subset.length} of ${all.length}`;
+      $('#list').innerHTML = subset.map(p=>renderCard(p, slug)).join('');
       wireAISummaries(subset, slug);
+      setQuery('q', qInput.value.trim() || null);
+      const hash = location.hash;
+      if(hash && hash.startsWith('#pmid-')){
+        const el = document.querySelector(hash);
+        if(el){ el.scrollIntoView({behavior:'smooth', block:'start'}); }
+      }
     }
 
-    // Mobile sheet wiring (with proper z-index & pointer events)
-    const sheet=document.getElementById('filterSheet');
-    const toggleBtn=document.getElementById('filterToggle');
-    const closeBtn=document.getElementById('filterClose');
-    const applyBtn=document.getElementById('filterApply');
-    const clearBtn=document.getElementById('filterClear');
-    const backdrop=document.getElementById('filterBackdrop');
+    let t=null;
+    qInput.addEventListener('input', ()=>{
+      clearTimeout(t);
+      t = setTimeout(()=>{ renderFilters(); render(); }, 150);
+    });
 
+    const sheet=$('#filterSheet'), toggleBtn=$('#filterToggle'), closeBtn=$('#filterClose'), applyBtn=$('#filterApply'), clearBtn=$('#filterClear'), backdrop=$('#filterBackdrop');
     function openSheet(){ sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false'); toggleBtn.setAttribute('aria-expanded','true'); }
     function closeSheet(){ sheet.classList.remove('open'); sheet.setAttribute('aria-hidden','true'); toggleBtn.setAttribute('aria-expanded','false'); }
-    toggleBtn.addEventListener('click', ()=>{
-      if(sheet.classList.contains('open')) closeSheet(); else openSheet();
-    });
-    closeBtn.addEventListener('click', ()=> closeSheet());
-    backdrop.addEventListener('click', ()=> closeSheet());
+    toggleBtn.addEventListener('click', ()=>{ sheet.classList.contains('open')?closeSheet():openSheet(); });
+    closeBtn.addEventListener('click', closeSheet);
+    backdrop.addEventListener('click', closeSheet);
     document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && sheet.classList.contains('open')) closeSheet(); });
 
-    applyBtn.addEventListener('click', ()=>{ closeSheet(); applyAndRender(); });
-    clearBtn.addEventListener('click', ()=>{
-      Object.assign(state,{pop:'all',type:'all',intv:'all'});
-      renderFilters();
-    });
+    applyBtn.addEventListener('click', ()=>{ closeSheet(); render(); });
+    clearBtn.addEventListener('click', ()=>{ Object.assign(state,{pop:'all',type:'all',intv:'all'}); renderFilters(); });
 
-    // init
     renderFilters();
     render();
+
   }catch(err){
     console.error("Fatal render error:", err);
-    document.getElementById('status').textContent="Render error. Open console for details.";
+    $('#status').textContent="Render error. Open console for details.";
   }
 })();
 </script>
