@@ -80,3 +80,22 @@ h1.brand{font-weight:700;letter-spacing:.02em;font-size:18px;margin:0}
 .abs-section:first-child{border-top:0}
 .abs-heading{font-weight:600;font-size:12px;color:#333;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
 .abs-body{font-size:14px;color:#111}
+
+/* review identifier */
+.review-id{
+  font-size:12px;
+  color:#666;
+  margin-left:auto; /* push to right edge */
+  padding-left:8px;
+  white-space:nowrap;
+}
+header.ld .brand{
+  font-weight:700;
+  letter-spacing:.02em;
+  font-size:18px;
+  text-decoration:none;
+  color:#111;
+  margin:0 8px;
+}
+header.ld .brand:hover{ text-decoration:underline }
+
