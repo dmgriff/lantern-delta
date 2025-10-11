@@ -11,6 +11,14 @@
   <header class="ld">
     <a class="home" href="index.html" aria-label="Home">home</a>
     <a class="brand" href="index.html" aria-label="Lantern Delta">lantern delta</a>
+
+    <!-- Review switcher -->
+    <div class="review-switch" id="reviewSwitchWrap" hidden>
+      <label for="reviewSwitch" class="sr-only">Switch review</label>
+      <select id="reviewSwitch" aria-label="Switch review"></select>
+    </div>
+
+    <!-- Current review text (still shown) -->
     <div class="review-id" id="reviewId" aria-live="polite"></div>
   </header>
 
@@ -191,29 +199,52 @@ function wireAISummaries(records, slug){
 
     // Identify the review (meta -> title; fallback to papers.json.title; else slug)
     async function resolveReviewTitle(){
-      // Try meta.json
       try{
         const m = await fetch(`data/${slug}/meta.json`, {cache:'no-store'});
-        if(m.ok){
-          const j = await m.json();
-          if(j && (j.title || j.name)) return j.title || j.name;
-        }
+        if(m.ok){ const j = await m.json(); if(j && (j.title || j.name)) return j.title || j.name; }
       }catch(e){}
-      // Fallback to papers.json
       try{
         const p = await fetch(`data/${slug}/papers.json`, {cache:'no-store'});
-        if(p.ok){
-          const j = await p.json();
-          if(j && j.title) return j.title;
-        }
+        if(p.ok){ const j = await p.json(); if(j && j.title) return j.title; }
       }catch(e){}
       return slug;
     }
     const reviewTitle = await resolveReviewTitle();
-    const rid = $('#reviewId');
-    rid.textContent = `Review: ${reviewTitle}`;
-    // Update tab title to include review
+    $('#reviewId').textContent = `Review: ${reviewTitle}`;
     document.title = `lantern delta — ${reviewTitle}`;
+
+    // Review switcher
+    async function loadReviewIndex(){
+      try{
+        const r = await fetch(`data/index.json`, {cache:'no-store'});
+        if(!r.ok) return null;
+        const j = await r.json();
+        return Array.isArray(j.reviews) ? j.reviews : null;
+      }catch(e){ return null; }
+    }
+    const reviews = await loadReviewIndex();
+    if(reviews && reviews.length){
+      const wrap = $('#reviewSwitchWrap');
+      const sel = $('#reviewSwitch');
+      sel.innerHTML = reviews.map(rv => {
+        const t = rv.title || rv.name || rv.slug;
+        const s = rv.slug;
+        const selected = (s === slug) ? ' selected' : '';
+        return `<option value="${esc(s)}"${selected}>${esc(t)}</option>`;
+      }).join('');
+      wrap.hidden = false;
+
+      sel.addEventListener('change', ()=>{
+        const nextSlug = sel.value;
+        // preserve view + q (and reset chips to 'all' for safety)
+        const u = new URL(location.href);
+        u.searchParams.set('slug', nextSlug);
+        u.searchParams.set('view', getQuery('view','all'));
+        const q = getQuery('q',''); if(q) u.searchParams.set('q', q); else u.searchParams.delete('q');
+        u.searchParams.set('pop','all'); u.searchParams.set('type','all'); u.searchParams.set('intv','all');
+        location.href = u.toString();
+      });
+    }
 
     // Load papers
     const r=await fetch(`data/${slug}/papers.json`,{cache:'no-store'});
@@ -230,9 +261,10 @@ function wireAISummaries(records, slug){
     const toolbar = $('#toolbar');
     const toolbarMobile = $('#toolbarMobile');
 
+    function filtersHTML(state, counts){ return FILTERS_DEF.map(g=>groupUI(g,state,counts||{})).join(""); }
     function renderFilters(){
       const counts = computeCounts(all, view, qInput.value.trim());
-      const html = filtersUI(state, counts);
+      const html = filtersHTML(state, counts);
       toolbar.innerHTML = html;
       toolbarMobile.innerHTML = html;
     }
@@ -266,7 +298,7 @@ function wireAISummaries(records, slug){
 
     // Search debounce
     let t=null;
-    qInput.addEventListener('input', ()=>{
+    $('#q').addEventListener('input', ()=>{
       clearTimeout(t);
       t = setTimeout(()=>{ renderFilters(); render(); }, 150);
     });
