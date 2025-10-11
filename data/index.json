@@ -1,0 +1,7 @@
+{
+  "reviews": [
+    { "slug": "sample_ic_anaemia", "title": "INTACT2 Living Review" },
+    { "slug": "periop_blood", "title": "Perioperative Patient Blood Management" },
+    { "slug": "ckd_esa_iron", "title": "CKD: ESA & IV Iron" }
+  ]
+}
